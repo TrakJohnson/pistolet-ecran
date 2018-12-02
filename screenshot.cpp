@@ -1,5 +1,6 @@
 #include <iostream>
 #include <X11/Xlib.h>
+#include <X11/cursorfont.h>
 #include <CImg.h>
 
 using namespace cimg_library;
@@ -7,6 +8,7 @@ using namespace std;
 
 static Display *display;
 static Window root;
+
 
 CImg<unsigned char> screenshot(int top_x, int top_y, int width, int height) {
     XImage *image = XGetImage(display, root, top_x, top_y, width, height, AllPlanes, ZPixmap);
@@ -30,13 +32,71 @@ CImg<unsigned char> screenshot(int top_x, int top_y, int width, int height) {
 	    pic(x, y, 2) = blue;
         }
     }
-
     return pic;
+}
+
+int* capture_two_mice(int coords[4]) {
+    /* This functions captures two mouse clicks, 
+     * which will be used to define the boundary of the region screenshot
+     */
+    
+    XEvent ev;
+    Display *display = XOpenDisplay(NULL);
+
+    if(!display) {
+	return nullptr;
+    }
+
+    Screen *scr = ScreenOfDisplay(display, DefaultScreen(display));
+    Window root = RootWindow(display, XScreenNumberOfScreen(scr));
+
+    Cursor cursor = XCreateFontCursor(display, XC_crosshair);
+
+    if (XGrabPointer(display, root, False,
+		     ButtonMotionMask | ButtonPressMask | ButtonReleaseMask, GrabModeAsync,
+		     GrabModeAsync, root, cursor, CurrentTime) != GrabSuccess) {
+	printf("ouldn't grab pointer:");
+    }
+
+    int done = 0;
+    int click_count = 0;
+    // Main event loop
+    while (!done) {
+	if (!XPending(display)) {
+	    usleep(10);
+	    continue;
+	}
+	if ((XNextEvent(display, &ev) >= 0)) {
+	    switch (ev.type) {
+	    case ButtonRelease:
+		if (ev.xbutton.button == 1) {
+		    coords[click_count * 2] = ev.xmotion.x;
+		    coords[click_count * 2 + 1] = ev.xmotion.y;
+		    click_count += 1;
+		    if (click_count == 2) {
+			return coords;
+		    }
+		}
+		break;
+	    default:
+		break;
+	    }
+	}
+    }
+    XCloseDisplay(display);
+}
+
+CImg<unsigned char> region_screenshot() {
+    int coords [4];
+    capture_two_mice(coords);
+    printf("%d %d %d %d\n", coords[0], coords[1], coords[2], coords[3]);
+    return screenshot(coords[0], coords[1], coords[2] - coords[0], coords[3] - coords[1]);
 }
 
 CImg<unsigned char> fullscreen_screenshot() {
     XWindowAttributes gwa;
     XGetWindowAttributes(display, root, &gwa);
+    cout << gwa.width << " " << gwa.height << endl;
     return screenshot(0, 0, gwa.width, gwa.height);
 }
 
@@ -44,9 +104,9 @@ int main() {
     // Global variables
     display = XOpenDisplay(nullptr);
     root = DefaultRootWindow(display);
-
-    CImg<unsigned char> pic = fullscreen_screenshot();    
-    pic.save_png("/home/theo/Documents/blah.png");
+    
+    CImg<unsigned char> pic = region_screenshot();
+    pic.save_png("/home/theo/Pictures/blah.png");
     cout << "Screenshot saved" << endl;
 
     return 0;
