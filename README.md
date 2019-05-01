@@ -1,6 +1,6 @@
 # pistolet-écran (screenshooter)
 
-Yet another screenshot tool. Only works on Linux (for reasons we hold to be self-evident).
+Yet another screenshot tool. Only (doesn't) works on Linux (for reasons we hold to be self-evident).
 
 
 Uses:
